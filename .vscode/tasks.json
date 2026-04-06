@@ -1,0 +1,84 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Hybrid (Maven)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\build.ps1",
+        "-SkipTests"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Server",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\run-server.ps1",
+        "-SkipBuild",
+        "-Port",
+        "61000"
+      ],
+      "dependsOn": [
+        "Build Hybrid (Maven)"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Client Hybrid",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\run.ps1",
+        "-SkipBuild",
+        "-Mode",
+        "hybrid",
+        "-Iface",
+        "${input:ifaceName}",
+        "-ServerHost",
+        "${input:serverHost}",
+        "-ServerPort",
+        "${input:serverPort}"
+      ],
+      "dependsOn": [
+        "Build Hybrid (Maven)"
+      ],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "ifaceName",
+      "type": "promptString",
+      "description": "Network interface name",
+      "default": "Wi-Fi"
+    },
+    {
+      "id": "serverHost",
+      "type": "promptString",
+      "description": "TCP server host",
+      "default": "127.0.0.1"
+    },
+    {
+      "id": "serverPort",
+      "type": "promptString",
+      "description": "TCP server port",
+      "default": "61000"
+    }
+  ]
+}

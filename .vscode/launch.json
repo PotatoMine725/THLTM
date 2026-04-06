@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Client Main (Module)",
+      "request": "launch",
+      "mainClass": "com.wifichat.Main",
+      "projectName": "client",
+      "args": "--mode hybrid --server-host ${input:serverHost} --server-port ${input:serverPort} --iface ${input:ifaceName}",
+      "preLaunchTask": "Build Hybrid (Maven)",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "java",
+      "name": "Server Main (Module)",
+      "request": "launch",
+      "mainClass": "com.wifichat.server.ServerMain",
+      "projectName": "server",
+      "args": "--port ${input:serverPort}",
+      "preLaunchTask": "Build Hybrid (Maven)",
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "ifaceName",
+      "type": "promptString",
+      "description": "Network interface name",
+      "default": "Wi-Fi"
+    },
+    {
+      "id": "serverHost",
+      "type": "promptString",
+      "description": "TCP server host",
+      "default": "127.0.0.1"
+    },
+    {
+      "id": "serverPort",
+      "type": "promptString",
+      "description": "TCP server port",
+      "default": "61000"
+    }
+  ]
+}

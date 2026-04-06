@@ -1,0 +1,8 @@
+com\wifichat\server\db\ChatRepository.class
+com\wifichat\server\model\SessionInfo.class
+com\wifichat\server\model\UserAccount.class
+com\wifichat\server\net\TcpChatServer$ClientHandler.class
+com\wifichat\server\net\TcpChatServer.class
+com\wifichat\server\model\AuthContext.class
+com\wifichat\server\ServerMain.class
+com\wifichat\server\auth\PasswordService.class

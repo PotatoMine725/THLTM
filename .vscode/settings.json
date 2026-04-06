@@ -1,0 +1,14 @@
+{
+  "java.autobuild.enabled": true,
+  "java.project.sourcePaths": [
+    "client/src/main/java",
+    "server/src/main/java",
+    "shared/src/main/java"
+  ],
+  "java.project.outputPath": "out/classes",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.exclusions": [
+    "legacy_src_backup/**",
+    "out/**"
+  ]
+}

@@ -1,0 +1,4 @@
+Starting WiFi Chat TCP server...
+Port: 61000
+DB: D:\Code\Java\test\out\local-test.db
+TCP server listening on port 61000
