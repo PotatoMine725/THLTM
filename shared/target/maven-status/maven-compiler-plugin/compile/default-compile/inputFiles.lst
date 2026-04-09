@@ -1,3 +1,10 @@
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminDeleteConversationRequest.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminDeleteMessageRequest.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminListConversationsRequest.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminListUsersRequest.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminSetUserMutedRequest.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminUserInfo.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AdminUsersResponse.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\AuthResponse.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\ConversationsResponse.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\dto\FetchHistoryRequest.java
@@ -16,4 +23,8 @@ D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\protocol\PacketTypes.
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\protocol\WireCodec.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\protocol\WireEnvelope.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\TransportMode.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\ui\AppTheme.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\ui\FlatLafBootstrap.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\ui\RoundedBorder.java
+D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\ui\UIHelper.java
 D:\Code\Java\test\shared\src\main\java\com\wifichat\shared\util\ConversationKeys.java

@@ -1,6 +1,8 @@
 package com.wifichat.server;
 
+import com.wifichat.server.auth.PasswordService;
 import com.wifichat.server.db.ChatRepository;
+import com.wifichat.server.model.UserAccount;
 import com.wifichat.server.net.TcpChatServer;
 
 import java.nio.file.Files;
@@ -30,6 +32,7 @@ public final class ServerMain {
 
         ChatRepository repository = new ChatRepository(dbPath);
         repository.init();
+        bootstrapAdmin(repository);
 
         TcpChatServer server = new TcpChatServer(port, repository);
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
@@ -39,6 +42,24 @@ public final class ServerMain {
         System.out.println("DB: " + dbPath);
 
         server.start();
+    }
+
+    private static void bootstrapAdmin(ChatRepository repository) throws Exception {
+        final String defaultAdminUser = "admin";
+        final String defaultAdminPass = "admin123";
+        UserAccount existing = repository.findUserByUsername(defaultAdminUser);
+        if (existing != null) {
+            return;
+        }
+
+        PasswordService passwordService = new PasswordService();
+        String salt = passwordService.newSaltBase64();
+        String hash = passwordService.hash(defaultAdminPass, salt);
+        repository.createUserWithRole(defaultAdminUser, "System Admin", hash, salt, ChatRepository.ROLE_ADMIN);
+
+        System.out.println("[bootstrap] Created admin account");
+        System.out.println("[bootstrap] username: admin");
+        System.out.println("[bootstrap] password: admin123");
     }
 
     private static int parseIntArg(String[] args, String name, int defaultValue) {
@@ -65,4 +86,3 @@ public final class ServerMain {
         return defaultValue;
     }
 }
-

@@ -12,6 +12,7 @@
         <module>shared</module>
         <module>server</module>
         <module>client</module>
+        <module>admin</module>
     </modules>
 
     <properties>
@@ -20,4 +21,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>        <sqlite.version>3.47.0.0</sqlite.version>
     </properties>
 </project>
+
+
 

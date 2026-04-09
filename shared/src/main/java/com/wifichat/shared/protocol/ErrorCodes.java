@@ -5,6 +5,8 @@ public final class ErrorCodes {
     public static final String USERNAME_TAKEN = "USERNAME_TAKEN";
     public static final String SESSION_EXPIRED = "SESSION_EXPIRED";
     public static final String FORBIDDEN = "FORBIDDEN";
+    public static final String ADMIN_REQUIRED = "ADMIN_REQUIRED";
+    public static final String USER_MUTED = "USER_MUTED";
     public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
 

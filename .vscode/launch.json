@@ -3,6 +3,13 @@
   "configurations": [
     {
       "type": "java",
+      "name": "AdminMain",
+      "request": "launch",
+      "mainClass": "com.wifichat.admin.AdminMain",
+      "projectName": "admin"
+    },
+    {
+      "type": "java",
       "name": "Client Main (Module)",
       "request": "launch",
       "mainClass": "com.wifichat.Main",

@@ -1,0 +1,6 @@
+com\wifichat\admin\tcp\AdminTcpException.class
+com\wifichat\admin\auth\AuthSession.class
+com\wifichat\admin\auth\LoginDialog.class
+com\wifichat\admin\tcp\AdminTcpClient.class
+com\wifichat\admin\config\AdminConfig.class
+com\wifichat\admin\auth\SessionStore.class

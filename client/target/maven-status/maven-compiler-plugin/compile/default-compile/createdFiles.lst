@@ -7,7 +7,6 @@ com\wifichat\model\ChatMessage.class
 com\wifichat\tcp\TcpChatClient.class
 com\wifichat\network\ChatNode$1.class
 com\wifichat\model\PeerAnnouncement.class
-com\wifichat\ui\MainFrame$7.class
 com\wifichat\network\ChatNodeListener.class
 com\wifichat\tcp\TcpClientException.class
 com\wifichat\ui\MainFrame$2.class

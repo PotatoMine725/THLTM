@@ -5,6 +5,12 @@ import com.wifichat.server.db.ChatRepository;
 import com.wifichat.server.model.AuthContext;
 import com.wifichat.server.model.SessionInfo;
 import com.wifichat.server.model.UserAccount;
+import com.wifichat.shared.dto.AdminDeleteConversationRequest;
+import com.wifichat.shared.dto.AdminDeleteMessageRequest;
+import com.wifichat.shared.dto.AdminListConversationsRequest;
+import com.wifichat.shared.dto.AdminListUsersRequest;
+import com.wifichat.shared.dto.AdminSetUserMutedRequest;
+import com.wifichat.shared.dto.AdminUsersResponse;
 import com.wifichat.shared.dto.AuthResponse;
 import com.wifichat.shared.dto.ConversationsResponse;
 import com.wifichat.shared.dto.FetchHistoryRequest;
@@ -29,7 +35,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.SQLException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -89,7 +94,6 @@ public class TcpChatServer {
         }
     }
 
-
     private final class ClientHandler implements Runnable {
         private final Socket socket;
         private final WireCodec codec;
@@ -134,6 +138,11 @@ public class TcpChatServer {
                     case PacketTypes.SUBSCRIBE_CONVERSATION -> handleSubscribe(request);
                     case PacketTypes.HEARTBEAT -> handleHeartbeat(request);
                     case PacketTypes.LIST_CONVERSATIONS -> handleListConversations(request);
+                    case PacketTypes.ADMIN_LIST_CONVERSATIONS -> handleAdminListConversations(request);
+                    case PacketTypes.ADMIN_LIST_USERS -> handleAdminListUsers(request);
+                    case PacketTypes.ADMIN_DELETE_MESSAGE -> handleAdminDeleteMessage(request);
+                    case PacketTypes.ADMIN_DELETE_CONVERSATION -> handleAdminDeleteConversation(request);
+                    case PacketTypes.ADMIN_SET_USER_MUTED -> handleAdminSetUserMuted(request);
                     default -> send(WireEnvelope.error(request.requestId, ErrorCodes.VALIDATION_ERROR, "Unsupported request type"));
                 }
             } catch (SQLException e) {
@@ -205,6 +214,7 @@ public class TcpChatServer {
             response.userId = context.userId;
             response.username = context.username;
             response.displayName = context.displayName;
+            response.role = context.role;
             response.expiresAt = context.expiresAt;
             send(ok(request.requestId, response));
         }
@@ -218,6 +228,11 @@ public class TcpChatServer {
 
             AuthContext context = requireSession(payload.sessionToken, request.requestId);
             if (context == null) {
+                return;
+            }
+
+            if (repository.isUserMuted(context.userId)) {
+                send(WireEnvelope.error(request.requestId, ErrorCodes.USER_MUTED, "Your account is muted by admin"));
                 return;
             }
 
@@ -281,7 +296,8 @@ public class TcpChatServer {
                 return;
             }
 
-            if (!repository.isConversationMember(payload.conversationKey, context.userId)) {
+            boolean admin = isAdmin(context);
+            if (!admin && !repository.isConversationMember(payload.conversationKey, context.userId)) {
                 send(WireEnvelope.error(request.requestId, ErrorCodes.FORBIDDEN, "Not a member of this conversation"));
                 return;
             }
@@ -307,7 +323,7 @@ public class TcpChatServer {
                 return;
             }
 
-            if (ConversationKeys.isPm(payload.conversationKey) && !payload.conversationKey.contains(context.userId)) {
+            if (ConversationKeys.isPm(payload.conversationKey) && !payload.conversationKey.contains(context.userId) && !isAdmin(context)) {
                 send(WireEnvelope.error(request.requestId, ErrorCodes.FORBIDDEN, "Forbidden PM conversation"));
                 return;
             }
@@ -342,6 +358,76 @@ public class TcpChatServer {
             send(WireEnvelope.of(PacketTypes.CONVERSATIONS, request.requestId, response));
         }
 
+        private void handleAdminListConversations(WireEnvelope request) throws SQLException {
+            AdminListConversationsRequest payload = parse(request.payload, AdminListConversationsRequest.class);
+            AuthContext context = requireAdmin(payload == null ? null : payload.sessionToken, request.requestId);
+            if (context == null) {
+                return;
+            }
+
+            int limit = payload.limit <= 0 ? 80 : Math.min(payload.limit, 600);
+            ConversationsResponse response = new ConversationsResponse();
+            response.conversationKeys = repository.listAllConversations(limit);
+            send(WireEnvelope.of(PacketTypes.CONVERSATIONS, request.requestId, response));
+        }
+
+        private void handleAdminListUsers(WireEnvelope request) throws SQLException {
+            AdminListUsersRequest payload = parse(request.payload, AdminListUsersRequest.class);
+            AuthContext context = requireAdmin(payload == null ? null : payload.sessionToken, request.requestId);
+            if (context == null) {
+                return;
+            }
+
+            AdminUsersResponse response = new AdminUsersResponse();
+            response.users = repository.listAllUsers();
+            send(WireEnvelope.of(PacketTypes.ADMIN_USERS, request.requestId, response));
+        }
+
+        private void handleAdminDeleteMessage(WireEnvelope request) throws SQLException {
+            AdminDeleteMessageRequest payload = parse(request.payload, AdminDeleteMessageRequest.class);
+            AuthContext context = requireAdmin(payload == null ? null : payload.sessionToken, request.requestId);
+            if (context == null) {
+                return;
+            }
+            if (payload == null || isBlank(payload.messageId)) {
+                send(WireEnvelope.error(request.requestId, ErrorCodes.VALIDATION_ERROR, "messageId is required"));
+                return;
+            }
+
+            repository.deleteMessage(payload.messageId);
+            send(WireEnvelope.of(PacketTypes.OK, request.requestId, null));
+        }
+
+        private void handleAdminDeleteConversation(WireEnvelope request) throws SQLException {
+            AdminDeleteConversationRequest payload = parse(request.payload, AdminDeleteConversationRequest.class);
+            AuthContext context = requireAdmin(payload == null ? null : payload.sessionToken, request.requestId);
+            if (context == null) {
+                return;
+            }
+            if (payload == null || isBlank(payload.conversationKey)) {
+                send(WireEnvelope.error(request.requestId, ErrorCodes.VALIDATION_ERROR, "conversationKey is required"));
+                return;
+            }
+
+            repository.deleteConversation(payload.conversationKey);
+            send(WireEnvelope.of(PacketTypes.OK, request.requestId, null));
+        }
+
+        private void handleAdminSetUserMuted(WireEnvelope request) throws SQLException {
+            AdminSetUserMutedRequest payload = parse(request.payload, AdminSetUserMutedRequest.class);
+            AuthContext context = requireAdmin(payload == null ? null : payload.sessionToken, request.requestId);
+            if (context == null) {
+                return;
+            }
+            if (payload == null || isBlank(payload.userId)) {
+                send(WireEnvelope.error(request.requestId, ErrorCodes.VALIDATION_ERROR, "userId is required"));
+                return;
+            }
+
+            repository.setUserMuted(payload.userId, payload.muted);
+            send(WireEnvelope.of(PacketTypes.OK, request.requestId, null));
+        }
+
         private AuthContext requireSession(String token, String requestId) throws SQLException {
             AuthContext context = repository.authBySession(token);
             if (context == null) {
@@ -351,12 +437,35 @@ public class TcpChatServer {
             return context;
         }
 
+        private AuthContext requireAdmin(String token, String requestId) throws SQLException {
+            AuthContext context = requireSession(token, requestId);
+            if (context == null) {
+                return null;
+            }
+            if (!isAdmin(context)) {
+                send(WireEnvelope.error(requestId, ErrorCodes.ADMIN_REQUIRED, "Admin permission required"));
+                return null;
+            }
+            return context;
+        }
+
+        private boolean isAdmin(AuthContext context) throws SQLException {
+            if (context == null) {
+                return false;
+            }
+            if (ChatRepository.ROLE_ADMIN.equalsIgnoreCase(context.role)) {
+                return true;
+            }
+            return repository.isAdmin(context.userId);
+        }
+
         private void sendOkAuth(String requestId, UserAccount user, SessionInfo session) {
             AuthResponse response = new AuthResponse();
             response.sessionToken = session.token;
             response.userId = user.id;
             response.username = user.username;
             response.displayName = user.displayName;
+            response.role = user.role;
             response.expiresAt = session.expiresAt;
             send(ok(requestId, response));
         }
@@ -393,5 +502,3 @@ public class TcpChatServer {
         }
     }
 }
-
-

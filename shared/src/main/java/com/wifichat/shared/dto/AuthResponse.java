@@ -5,9 +5,9 @@ public class AuthResponse implements java.io.Serializable {
     public String userId;
     public String username;
     public String displayName;
+    public String role;
     public long expiresAt;
 
     public AuthResponse() {
     }
 }
-

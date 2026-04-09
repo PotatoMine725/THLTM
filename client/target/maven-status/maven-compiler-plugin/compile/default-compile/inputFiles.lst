@@ -18,8 +18,13 @@ D:\Code\Java\test\client\src\main\java\com\wifichat\tcp\TcpChatClient.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\tcp\TcpClientException.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\tcp\TcpEventListener.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\ui\AppTheme.java
+D:\Code\Java\test\client\src\main\java\com\wifichat\ui\DirectMessageEntry.java
+D:\Code\Java\test\client\src\main\java\com\wifichat\ui\DirectMessageListRenderer.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\ui\MainFrame.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\ui\MessageCellRenderer.java
+D:\Code\Java\test\client\src\main\java\com\wifichat\ui\PeerListRenderer.java
+D:\Code\Java\test\client\src\main\java\com\wifichat\ui\RoomListRenderer.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\ui\RoundedBorder.java
+D:\Code\Java\test\client\src\main\java\com\wifichat\ui\SidebarPanel.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\util\TextUtils.java
 D:\Code\Java\test\client\src\main\java\com\wifichat\util\TimeUtils.java

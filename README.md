@@ -15,6 +15,7 @@ Ung dung Java chat da duoc nang cap tu UDP thu?n sang hybrid:
 |-- shared/                (DTO/protocol/transport dung chung)
 |-- server/                (TCP auth/history sync + SQLite)
 |-- client/                (Swing GUI + UDP + TCP client + login)
+|-- admin/                 (Swing Admin GUI + chat moderation tools)
 `-- scripts/
     |-- build.ps1
     |-- run.ps1
@@ -182,7 +183,7 @@ Nhan `Ctrl + C` o terminal dang chay.
 ## 7) Han che hien tai
 
 - Chua bat TLS (LAN-first)
-- Chua co phan quyen admin/account management
+- Da ho tro quyen ADMIN va app admin quan ly chat
 - Chua co migration phuc tap cho schema (v1 auto-create)
 
 ## 8) Dong goi gui client (khong can cai Java)
@@ -202,4 +203,31 @@ Nguoi dung chi can giai nen zip va double-click `start-client.bat`.
 Luu y ve installer `.exe`:
 - Script se thu tao installer bang `jpackage`
 - Neu may build chua cai WiX Toolset thi se skip installer va van co portable zip.
+
+
+
+## 9) Admin app (quan ly chat)
+
+### 9.1 Tai khoan admin mac dinh
+
+Khi server khoi dong voi DB moi, he thong tu tao tai khoan admin:
+
+- `username`: `admin`
+- `password`: `admin123`
+
+> Nen doi mat khau ngay sau khi trien khai thuc te.
+
+### 9.2 Chay admin UI
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-admin.ps1 -SkipBuild -ServerHost 127.0.0.1 -ServerPort 61000 -Profile adminA
+```
+
+### 9.3 Chuc nang admin
+
+- Xem toan bo conversations tren server
+- Xem lich su chat cua bat ky conversation
+- Xoa message cu the
+- Xoa conversation
+- Mute / Unmute user (chan/cho phep gui tin nhan)
 

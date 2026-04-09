@@ -19,6 +19,8 @@ public final class Main {
     }
 
     public static void main(String[] args) {
+        com.wifichat.shared.ui.FlatLafBootstrap.setup();
+
         AppConfig config = AppConfig.fromArgs(args);
         if (config.transportMode() == TransportMode.HYBRID) {
             runHybrid(config);

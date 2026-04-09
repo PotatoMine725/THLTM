@@ -7,9 +7,11 @@ import com.wifichat.model.PeerInfo;
 import com.wifichat.network.ChatNode;
 import com.wifichat.network.ChatNodeListener;
 import com.wifichat.network.MessageFactory;
+import com.wifichat.shared.ui.UIHelper;
 import com.wifichat.shared.util.ConversationKeys;
 import com.wifichat.util.TextUtils;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -26,12 +28,15 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.KeyStroke;
 import javax.swing.ListModel;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -39,16 +44,14 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.awt.GradientPaint;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
-import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -69,12 +72,16 @@ public class MainFrame extends JFrame implements ChatNodeListener {
     private final Map<String, PeerInfo> peersById;
     private final Map<String, Set<String>> conversationMessageIds;
     private final Map<String, String> pmTargetByConversation;
+    private final Map<String, Integer> unreadByConversation;
+    private final Map<String, DirectMessageEntry> dmEntriesByPeer;
 
     private final Set<String> joinedRooms;
     private final Set<String> discoveredRooms;
 
     private final DefaultListModel<String> roomListModel;
     private final JList<String> roomList;
+    private final DefaultListModel<DirectMessageEntry> dmListModel;
+    private final JList<DirectMessageEntry> dmList;
     private final DefaultListModel<PeerInfo> peerListModel;
     private final JList<PeerInfo> peerList;
 
@@ -84,6 +91,11 @@ public class MainFrame extends JFrame implements ChatNodeListener {
     private final JTextArea composer;
     private final JLabel replyLabel;
     private final JPanel replyPanel;
+    private final JLabel typingLabel;
+    private final JPanel typingPanel;
+    private final JLabel channelsUnreadLabel;
+    private final JLabel directUnreadLabel;
+    private final JLabel friendsUnreadLabel;
 
     private String currentConversationKey;
     private ChatMessage replyTarget;
@@ -103,12 +115,16 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         this.peersById = new LinkedHashMap<>();
         this.conversationMessageIds = new LinkedHashMap<>();
         this.pmTargetByConversation = new LinkedHashMap<>();
+        this.unreadByConversation = new LinkedHashMap<>();
+        this.dmEntriesByPeer = new LinkedHashMap<>();
 
         this.joinedRooms = new LinkedHashSet<>();
         this.discoveredRooms = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
         this.roomListModel = new DefaultListModel<>();
         this.roomList = new JList<>(roomListModel);
+        this.dmListModel = new DefaultListModel<>();
+        this.dmList = new JList<>(dmListModel);
         this.peerListModel = new DefaultListModel<>();
         this.peerList = new JList<>(peerListModel);
 
@@ -117,14 +133,20 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         this.statusLabel = new JLabel("Ready", SwingConstants.LEFT);
         this.composer = new JTextArea(3, 30);
         this.replyLabel = new JLabel();
-        this.replyPanel = new JPanel(new BorderLayout());
+        this.replyPanel = new JPanel(new BorderLayout(8, 0));
+        this.typingLabel = new JLabel();
+        this.typingPanel = new JPanel(new BorderLayout());
+        
+        this.channelsUnreadLabel = createUnreadHeaderBadge();
+        this.directUnreadLabel = createUnreadHeaderBadge();
+        this.friendsUnreadLabel = createUnreadHeaderBadge();
 
         setupWindow();
         setupLayout();
         setupInteractions();
+        updateSidebarUnreadBadges();
 
         joinRoom(config.defaultRoom(), true);
-
     }
 
     public void startNodeSafely() {
@@ -132,8 +154,8 @@ public class MainFrame extends JFrame implements ChatNodeListener {
             try {
                 node.start();
                 SwingUtilities.invokeLater(() -> {
-                    setStatus("Connected to " + config.multicastGroup().getHostAddress() + ":" + config.multicastPort() +
-                            (node.isHybrid() ? " | TCP " + config.serverHost() + ":" + config.serverPort() : ""));
+                    setStatus("Connected to " + config.multicastGroup().getHostAddress() + ":" + config.multicastPort()
+                            + (node.isHybrid() ? " | TCP " + config.serverHost() + ":" + config.serverPort() : ""));
                     preloadConversationFromServerAsync();
                 });
             } catch (IOException e) {
@@ -175,8 +197,8 @@ public class MainFrame extends JFrame implements ChatNodeListener {
 
     private void setupWindow() {
         setTitle("WiFi Multicast Chat - " + node.userName());
-        setSize(1220, 780);
-        setMinimumSize(new Dimension(1024, 680));
+        setSize(1240, 820);
+        setMinimumSize(new Dimension(1040, 700));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         getContentPane().setBackground(AppTheme.WINDOW_BG);
@@ -194,282 +216,240 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         JPanel center = buildCenterPane();
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sidebar, center);
-        splitPane.setDividerLocation(330);
-        splitPane.setResizeWeight(0.28);
-        splitPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        splitPane.setDividerSize(8);
+        splitPane.setDividerLocation(300);
+        splitPane.setResizeWeight(0.20);
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
+        splitPane.setDividerSize(3);
+        splitPane.setContinuousLayout(true);
+        splitPane.setBackground(AppTheme.WINDOW_BG);
 
         setLayout(new BorderLayout());
         add(splitPane, BorderLayout.CENTER);
     }
 
     private JPanel buildSidebar() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new EmptyBorder(6, 6, 6, 6));
-        panel.setBackground(AppTheme.SIDEBAR_BG);
-
-        JPanel appCard = createCardPanel();
-        appCard.setLayout(new BoxLayout(appCard, BoxLayout.Y_AXIS));
-        JLabel appTitle = new JLabel("LAN Chat Hub");
-        appTitle.setFont(AppTheme.heading(24));
-        appTitle.setForeground(AppTheme.STRONG_TEXT);
-        JLabel appSubtitle = new JLabel(node.isHybrid() ? "Hybrid mode (TCP + UDP)" : "UDP legacy mode");
-        appSubtitle.setFont(AppTheme.body(Font.PLAIN, 12));
-        appSubtitle.setForeground(AppTheme.SOFT_TEXT);
-        appCard.add(appTitle);
-        appCard.add(Box.createVerticalStrut(4));
-        appCard.add(appSubtitle);
-        if (onLogout != null) {
-            appCard.add(Box.createVerticalStrut(10));
-            JButton logoutButton = new JButton("Log Out");
-            styleButton(logoutButton, new Color(196, 92, 82));
-            logoutButton.addActionListener(e -> handleLogout());
-            appCard.add(logoutButton);
-        }
-
-        JPanel roomsCard = createSectionCard("Rooms", "Create channel spaces", AppTheme.ROOM_ACCENT);
-        JPanel roomButtons = new JPanel(new GridLayout(1, 2, 8, 0));
-        roomButtons.setOpaque(false);
-        JButton createRoomButton = new JButton("Create");
-        JButton joinRoomButton = new JButton("Join");
-        styleButton(createRoomButton, AppTheme.PRIMARY_BUTTON);
-        styleButton(joinRoomButton, AppTheme.NEUTRAL_BUTTON);
-        roomButtons.add(createRoomButton);
-        roomButtons.add(joinRoomButton);
-
-        roomList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        roomList.setBackground(new Color(248, 251, 255));
-        roomList.setFont(AppTheme.body(Font.PLAIN, 13));
-        roomList.setCellRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                label.setText("# " + value);
-                label.setBorder(new EmptyBorder(6, 10, 6, 8));
-                label.setFont(AppTheme.body(Font.BOLD, 13));
-                label.setBackground(isSelected ? new Color(209, 228, 255) : new Color(248, 251, 255));
-                label.setForeground(isSelected ? new Color(18, 79, 152) : new Color(49, 63, 81));
-                return label;
-            }
-        });
-        JScrollPane roomScroll = wrapScroll(roomList);
-        roomScroll.setPreferredSize(new Dimension(280, 220));
-
-        JPanel roomContent = new JPanel(new BorderLayout(0, 8));
-        roomContent.setOpaque(false);
-        roomContent.add(roomButtons, BorderLayout.NORTH);
-        roomContent.add(roomScroll, BorderLayout.CENTER);
-        roomsCard.add(roomContent, BorderLayout.CENTER);
-
-        JPanel usersCard = createSectionCard("Online Users", "Double-click to open PM", AppTheme.USER_ACCENT);
-        JButton pmButton = new JButton("Private Chat");
-        styleButton(pmButton, AppTheme.SUCCESS_BUTTON);
-
-        peerList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        peerList.setBackground(new Color(247, 255, 252));
-        peerList.setFont(AppTheme.body(Font.PLAIN, 13));
-        peerList.setCellRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (value instanceof PeerInfo peer) {
-                    label.setText("o " + peer.displayName() + "  [" + peer.address().getHostAddress() + "]");
-                }
-                label.setBorder(new EmptyBorder(6, 10, 6, 8));
-                label.setFont(AppTheme.body(Font.PLAIN, 13));
-                label.setBackground(isSelected ? new Color(205, 242, 226) : new Color(247, 255, 252));
-                label.setForeground(isSelected ? new Color(18, 106, 76) : new Color(42, 70, 58));
-                return label;
-            }
-        });
-        JScrollPane userScroll = wrapScroll(peerList);
-        userScroll.setPreferredSize(new Dimension(280, 240));
-
-        JPanel userContent = new JPanel(new BorderLayout(0, 8));
-        userContent.setOpaque(false);
-        userContent.add(pmButton, BorderLayout.NORTH);
-        userContent.add(userScroll, BorderLayout.CENTER);
-        usersCard.add(userContent, BorderLayout.CENTER);
-
-        createRoomButton.addActionListener(e -> promptJoinRoom());
-        joinRoomButton.addActionListener(e -> promptJoinRoom());
-        pmButton.addActionListener(e -> openSelectedPrivateChat());
-
-        panel.add(appCard);
-        panel.add(Box.createVerticalStrut(10));
-        panel.add(roomsCard);
-        panel.add(Box.createVerticalStrut(10));
-        panel.add(usersCard);
-        panel.add(Box.createVerticalGlue());
-
-        return panel;
+        return new SidebarPanel(
+                node.userName(),
+                node.isHybrid(),
+                onLogout == null ? null : this::handleLogout,
+                this::promptJoinRoom,
+                this::openSelectedPrivateChat,
+                roomList,
+                dmList,
+                peerList,
+                channelsUnreadLabel,
+                directUnreadLabel,
+                friendsUnreadLabel,
+                room -> unreadCount(roomKey(room)),
+                this::directMessageDotColor,
+                peerId -> unreadCount(pmKey(peerId)),
+                this::peerAvatarColor,
+                peerId -> unreadCount(pmKey(peerId))
+        );
     }
 
     private JPanel buildCenterPane() {
-        JPanel panel = new JPanel(new BorderLayout(0, 10));
-        panel.setBorder(new EmptyBorder(10, 0, 10, 10));
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout(0, 0));
         panel.setBackground(AppTheme.WINDOW_BG);
 
-        JPanel header = new JPanel(new BorderLayout()) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2d = (Graphics2D) g.create();
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint paint = new GradientPaint(
-                        0, 0, new Color(255, 198, 138),
-                        getWidth(), getHeight(), new Color(236, 128, 108)
-                );
-                g2d.setPaint(paint);
-                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
-                g2d.dispose();
-            }
-        };
-        header.setOpaque(false);
-        header.setBorder(new EmptyBorder(14, 16, 14, 16));
-
-        titleLabel.setFont(AppTheme.heading(22));
-        titleLabel.setForeground(new Color(35, 28, 22));
-        statusLabel.setFont(AppTheme.body(Font.BOLD, 12));
-        statusLabel.setForeground(new Color(62, 56, 52));
-        header.add(titleLabel, BorderLayout.NORTH);
-        header.add(statusLabel, BorderLayout.SOUTH);
-
-        JPanel messageCard = createCardPanel();
-        messageCard.setLayout(new BorderLayout());
-
-        messageList.setCellRenderer(new MessageCellRenderer(node.userId()));
-        messageList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        messageList.setBackground(new Color(252, 250, 255));
-        JScrollPane messageScroll = wrapScroll(messageList);
-        messageCard.add(messageScroll, BorderLayout.CENTER);
-
-        JPanel composerPanel = buildComposerPanel();
-
-        panel.add(header, BorderLayout.NORTH);
-        panel.add(messageCard, BorderLayout.CENTER);
-        panel.add(composerPanel, BorderLayout.SOUTH);
+        panel.add(buildConversationHeader(), BorderLayout.NORTH);
+        panel.add(buildMessageCard(), BorderLayout.CENTER);
+        panel.add(buildComposerPanel(), BorderLayout.SOUTH);
         return panel;
     }
 
+    private JPanel buildConversationHeader() {
+        JPanel header = createInnerPanel(14);
+        header.setLayout(new BorderLayout(8, 0));
+
+        JPanel titleBlock = new JPanel();
+        titleBlock.setOpaque(false);
+        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+
+        titleLabel.setFont(AppTheme.heading(30));
+        titleLabel.setForeground(AppTheme.TEXT_PRIMARY);
+        statusLabel.setFont(AppTheme.body(Font.PLAIN, 13));
+        statusLabel.setForeground(AppTheme.TEXT_SECONDARY);
+
+        titleBlock.add(titleLabel);
+        titleBlock.add(Box.createVerticalStrut(2));
+        titleBlock.add(statusLabel);
+
+        JPanel actions = new JPanel(new GridLayout(1, 2, 8, 0));
+        actions.setOpaque(false);
+
+        JButton historyButton = new JButton("History");
+        JButton membersButton = new JButton("Members");
+        UIHelper.styleButton(historyButton, AppTheme.GHOST_BUTTON, AppTheme.BORDER_STRONG, AppTheme.TEXT_PRIMARY, 12, 7, 14);
+        UIHelper.styleButton(membersButton, AppTheme.GHOST_BUTTON, AppTheme.BORDER_STRONG, AppTheme.TEXT_PRIMARY, 12, 7, 14);
+
+        historyButton.addActionListener(e -> setStatus("History panel ready (UI skeleton). Data source remains unchanged."));
+        membersButton.addActionListener(e -> setStatus("Members panel ready (UI skeleton) - online peers: " + peerListModel.size()));
+
+        actions.add(historyButton);
+        actions.add(membersButton);
+
+        header.add(titleBlock, BorderLayout.CENTER);
+        header.add(actions, BorderLayout.EAST);
+        return header;
+    }
+
+    private JPanel buildMessageCard() {
+        JPanel messageCard = createInnerPanel(14);
+        messageCard.setLayout(new BorderLayout(0, 4));
+
+        messageList.setCellRenderer(new MessageCellRenderer(node.userId()));
+        messageList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        messageList.setBackground(AppTheme.PANEL_BG);
+
+        JScrollPane messageScroll = wrapScroll(messageList);
+        messageScroll.getViewport().setBackground(AppTheme.PANEL_BG);
+        messageCard.add(messageScroll, BorderLayout.CENTER);
+
+        typingLabel.setFont(AppTheme.body(Font.PLAIN, 12));
+        typingLabel.setForeground(AppTheme.TEXT_MUTED);
+        typingLabel.setBorder(new EmptyBorder(4, 10, 3, 0));
+
+        typingPanel.setOpaque(false);
+        typingPanel.add(typingLabel, BorderLayout.WEST);
+        typingPanel.setVisible(false);
+
+        messageCard.add(typingPanel, BorderLayout.SOUTH);
+        return messageCard;
+    }
+
     private JPanel buildComposerPanel() {
-        JPanel panel = createCardPanel();
+        JPanel panel = createInnerPanel(14);
         panel.setLayout(new BorderLayout(0, 8));
 
         replyLabel.setFont(AppTheme.body(Font.PLAIN, 12));
-        replyLabel.setForeground(new Color(120, 74, 30));
-        replyPanel.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(233, 193, 157), 14, 1),
-                new EmptyBorder(4, 8, 4, 8)
-        ));
-        replyPanel.setBackground(new Color(255, 244, 231));
+        replyLabel.setForeground(AppTheme.TEXT_SECONDARY);
 
-        JButton cancelReplyButton = new JButton("Cancel");
-        styleButton(cancelReplyButton, AppTheme.NEUTRAL_BUTTON);
+        replyPanel.setOpaque(true);
+        replyPanel.setBackground(AppTheme.REPLY_BG);
+        replyPanel.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(AppTheme.BORDER_STRONG, 10, 1),
+                new EmptyBorder(5, 8, 5, 8)
+        ));
+
+        JButton cancelReplyButton = new JButton("x");
+        UIHelper.styleButton(cancelReplyButton, AppTheme.GHOST_BUTTON, AppTheme.BORDER_STRONG, AppTheme.TEXT_SECONDARY, 10, 3, 9);
         cancelReplyButton.addActionListener(e -> clearReplyContext());
 
         replyPanel.add(replyLabel, BorderLayout.CENTER);
         replyPanel.add(cancelReplyButton, BorderLayout.EAST);
         replyPanel.setVisible(false);
 
-        composer.setFont(AppTheme.body(Font.PLAIN, 14));
+        composer.setFont(AppTheme.body(Font.PLAIN, 15));
         composer.setLineWrap(true);
         composer.setWrapStyleWord(true);
-        composer.setBackground(new Color(249, 252, 255));
-        composer.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(204, 215, 230), 14, 1),
-                new EmptyBorder(8, 10, 8, 10)
-        ));
+        composer.setBackground(AppTheme.ITEM_BG);
+        composer.setForeground(AppTheme.TEXT_PRIMARY);
+        composer.setCaretColor(AppTheme.TEXT_PRIMARY);
+        composer.setBorder(new EmptyBorder(8, 10, 8, 10));
 
         JScrollPane composerScroll = new JScrollPane(composer);
         composerScroll.setBorder(BorderFactory.createEmptyBorder());
+        composerScroll.getVerticalScrollBar().setUnitIncrement(14);
+        composerScroll.putClientProperty("JComponent.roundRect", true);
+        composerScroll.setBackground(AppTheme.WINDOW_BG);
+        composerScroll.getViewport().setBackground(AppTheme.WINDOW_BG);
+
+
+
+        JLabel hintLabel = new JLabel("Ctrl+Enter to send | Right-click a message to reply");
+        hintLabel.setForeground(AppTheme.TEXT_MUTED);
+        hintLabel.setFont(AppTheme.body(Font.PLAIN, 12));
+
+        JPanel editorArea = new JPanel(new BorderLayout(0, 5));
+        editorArea.setOpaque(false);
+        editorArea.add(composerScroll, BorderLayout.CENTER);
+        editorArea.add(hintLabel, BorderLayout.SOUTH);
 
         JButton replyButton = new JButton("Reply Selected");
-        JButton sendButton = new JButton("Send Message");
-        styleButton(replyButton, AppTheme.NEUTRAL_BUTTON);
-        styleButton(sendButton, AppTheme.PRIMARY_BUTTON);
+        JButton sendButton = new JButton("Send");
+        UIHelper.styleButton(replyButton, AppTheme.GHOST_BUTTON, AppTheme.BORDER_STRONG, AppTheme.TEXT_PRIMARY, 10, 8, 12);
+        UIHelper.styleButton(sendButton, AppTheme.PRIMARY_BUTTON, AppTheme.PRIMARY_BUTTON.brighter(), AppTheme.TEXT_PRIMARY, 10, 8, 12);
 
         replyButton.addActionListener(e -> activateReplySelected());
         sendButton.addActionListener(e -> sendCurrentMessage());
 
-        composer.getInputMap().put(javax.swing.KeyStroke.getKeyStroke("ctrl ENTER"), "send-message");
-        composer.getActionMap().put("send-message", new javax.swing.AbstractAction() {
+        JPanel buttonColumn = new JPanel(new GridLayout(2, 1, 8, 8));
+        buttonColumn.setOpaque(false);
+        buttonColumn.setPreferredSize(new Dimension(148, 0));
+        buttonColumn.add(replyButton);
+        buttonColumn.add(sendButton);
+
+        composer.getInputMap().put(KeyStroke.getKeyStroke("ctrl ENTER"), "send-message");
+        composer.getActionMap().put("send-message", new AbstractAction() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
                 sendCurrentMessage();
             }
         });
 
-        JPanel buttonRow = new JPanel(new GridLayout(2, 1, 8, 8));
-        buttonRow.setOpaque(false);
-        buttonRow.add(replyButton);
-        buttonRow.add(sendButton);
-
         panel.add(replyPanel, BorderLayout.NORTH);
-        panel.add(composerScroll, BorderLayout.CENTER);
-        panel.add(buttonRow, BorderLayout.EAST);
-
+        panel.add(editorArea, BorderLayout.CENTER);
+        panel.add(buttonColumn, BorderLayout.EAST);
         return panel;
     }
 
-    private JPanel createCardPanel() {
+
+
+    private JPanel createInnerPanel(int radius) {
+        return createInnerPanel(radius, AppTheme.WINDOW_BG);
+    }
+
+    private JPanel createInnerPanel(int radius, Color background) {
         JPanel panel = new JPanel();
-        panel.setBackground(AppTheme.CARD_BG);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(212, 221, 232), 18, 1),
-                new EmptyBorder(10, 12, 10, 12)
-        ));
+        panel.setBackground(background);
+        panel.setBorder(new EmptyBorder(8, 12, 8, 12));
         return panel;
     }
 
-    private JPanel createSectionCard(String title, String subtitle, Color accent) {
-        JPanel card = createCardPanel();
-        card.setLayout(new BorderLayout(0, 8));
-
-        JPanel header = new JPanel();
-        header.setOpaque(false);
-        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
-
-        JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(AppTheme.heading(18));
-        titleLabel.setForeground(accent);
-
-        JLabel subtitleLabel = new JLabel(subtitle);
-        subtitleLabel.setFont(AppTheme.body(Font.PLAIN, 12));
-        subtitleLabel.setForeground(AppTheme.SOFT_TEXT);
-
-        header.add(titleLabel);
-        header.add(Box.createVerticalStrut(2));
-        header.add(subtitleLabel);
-
-        card.add(header, BorderLayout.NORTH);
-        return card;
-    }
-
-    private void styleButton(JButton button, Color background) {
-        button.setBackground(background);
-        button.setForeground(Color.WHITE);
-        button.setFont(AppTheme.body(Font.BOLD, 12));
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(background.darker(), 14, 1),
-                new EmptyBorder(7, 12, 7, 12)
-        ));
+    private JLabel createUnreadHeaderBadge() {
+        JLabel badge = new JLabel("", SwingConstants.CENTER);
+        badge.setFont(AppTheme.body(Font.BOLD, 10));
+        badge.setOpaque(true);
+        badge.setForeground(AppTheme.BADGE_TEXT);
+        badge.setBackground(AppTheme.BADGE_BG);
+        badge.setBorder(BorderFactory.createLineBorder(AppTheme.BADGE_BG.darker(), 1, true));
+        badge.setVisible(false);
+        return badge;
     }
 
     private JScrollPane wrapScroll(JList<?> list) {
+        return wrapScroll(list, AppTheme.ITEM_BG);
+    }
+
+    private JScrollPane wrapScroll(JList<?> list, Color background) {
         JScrollPane scroll = new JScrollPane(list);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(211, 220, 232), 14, 1),
-                BorderFactory.createEmptyBorder(3, 3, 3, 3)
+                new RoundedBorder(AppTheme.BORDER_SUBTLE, 12, 1),
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)
         ));
+        scroll.setBackground(background);
         scroll.getViewport().setBackground(list.getBackground());
+        scroll.getVerticalScrollBar().setUnitIncrement(14);
         return scroll;
     }
 
     private void setupInteractions() {
         roomList.addListSelectionListener(this::handleRoomSelection);
+
+        dmList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    DirectMessageEntry selected = dmList.getSelectedValue();
+                    if (selected != null) {
+                        openPrivateConversation(selected.peerId(), selected.displayName());
+                    }
+                }
+            }
+        });
 
         peerList.addMouseListener(new MouseAdapter() {
             @Override
@@ -506,6 +486,23 @@ public class MainFrame extends JFrame implements ChatNodeListener {
                     messageList.setSelectedIndex(index);
                     popup.show(messageList, e.getX(), e.getY());
                 }
+            }
+        });
+
+        composer.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateTypingIndicator();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateTypingIndicator();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateTypingIndicator();
             }
         });
     }
@@ -568,6 +565,7 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         titleLabel.setText(conversationTitles.getOrDefault(key, "#" + roomName));
         messageList.setModel(conversationModels.computeIfAbsent(key, ignored -> new DefaultListModel<>()));
         conversationMessageIds.computeIfAbsent(key, ignored -> new HashSet<>());
+        clearUnread(key);
         loadHistoryForConversationAsync(key);
         scrollToBottom();
         clearReplyContext();
@@ -588,9 +586,16 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         conversationMessageIds.computeIfAbsent(key, ignored -> new HashSet<>());
         conversationTitles.put(key, "@" + displayName);
         pmTargetByConversation.put(key, peerId);
+
+        DirectMessageEntry entry = ensureDirectMessageEntry(peerId, displayName);
+        if (entry != null) {
+            dmList.setSelectedValue(entry, true);
+        }
+
         currentConversationKey = key;
         titleLabel.setText("@" + displayName);
         messageList.setModel(conversationModels.get(key));
+        clearUnread(key);
         loadHistoryForConversationAsync(key);
         clearReplyContext();
         scrollToBottom();
@@ -646,8 +651,13 @@ public class MainFrame extends JFrame implements ChatNodeListener {
                     JOptionPane.showMessageDialog(this, "Selected user is currently offline.", "User Offline", JOptionPane.WARNING_MESSAGE);
                     return;
                 }
-                peer = new PeerInfo(targetUserId, conversationTitles.getOrDefault(currentConversationKey, "Unknown").replace("@", ""),
-                        java.net.InetAddress.getLoopbackAddress(), 0, System.currentTimeMillis());
+                peer = new PeerInfo(
+                        targetUserId,
+                        conversationTitles.getOrDefault(currentConversationKey, "Unknown").replace("@", ""),
+                        InetAddress.getLoopbackAddress(),
+                        0,
+                        System.currentTimeMillis()
+                );
             }
 
             ChatMessage message = messageFactory.privateMessage(peer, content, replyTarget);
@@ -685,7 +695,7 @@ public class MainFrame extends JFrame implements ChatNodeListener {
             return;
         }
         replyTarget = selected;
-        replyLabel.setText("Replying to: " + TextUtils.shortPreview(selected.senderName(), selected.content()));
+        replyLabel.setText("Reply to " + TextUtils.shortPreview(selected.senderName(), selected.content()));
         replyPanel.setVisible(true);
     }
 
@@ -759,6 +769,137 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         statusLabel.setText(message);
     }
 
+    private void updateTypingIndicator() {
+        String content = composer.getText();
+        boolean typing = content != null && !content.trim().isEmpty();
+        typingPanel.setVisible(typing);
+        typingLabel.setText(typing ? node.userName() + " is typing..." : "");
+    }
+
+    private void incrementUnread(String conversationKey) {
+        if (conversationKey == null) {
+            return;
+        }
+        unreadByConversation.merge(conversationKey, 1, Integer::sum);
+        roomList.repaint();
+        dmList.repaint();
+        peerList.repaint();
+        updateSidebarUnreadBadges();
+    }
+
+    private void clearUnread(String conversationKey) {
+        if (conversationKey == null) {
+            return;
+        }
+        if (unreadByConversation.remove(conversationKey) != null) {
+            roomList.repaint();
+            dmList.repaint();
+            peerList.repaint();
+            updateSidebarUnreadBadges();
+        }
+    }
+
+    private int unreadCount(String conversationKey) {
+        if (conversationKey == null) {
+            return 0;
+        }
+        return unreadByConversation.getOrDefault(conversationKey, 0);
+    }
+
+    private void updateSidebarUnreadBadges() {
+        int channelsUnread = 0;
+        int directUnread = 0;
+        int friendsUnread = 0;
+
+        for (Map.Entry<String, Integer> entry : unreadByConversation.entrySet()) {
+            String key = entry.getKey();
+            int unread = entry.getValue() == null ? 0 : entry.getValue();
+            if (unread <= 0 || key == null) {
+                continue;
+            }
+
+            if (ConversationKeys.isRoom(key)) {
+                channelsUnread += unread;
+                continue;
+            }
+
+            if (ConversationKeys.isPm(key)) {
+                directUnread += unread;
+                String peerId = extractOtherUserFromPmKey(key);
+                if (peerId != null && peersById.containsKey(peerId)) {
+                    friendsUnread += unread;
+                }
+            }
+        }
+
+        updateUnreadBadge(channelsUnreadLabel, channelsUnread);
+        updateUnreadBadge(directUnreadLabel, directUnread);
+        updateUnreadBadge(friendsUnreadLabel, friendsUnread);
+    }
+
+    private void updateUnreadBadge(JLabel badge, int count) {
+        if (badge == null) {
+            return;
+        }
+        if (count <= 0) {
+            badge.setVisible(false);
+            badge.setText("");
+            return;
+        }
+        badge.setText(count > 99 ? "99+" : String.valueOf(count));
+        badge.setVisible(true);
+    }
+
+    private Color colorFromPalette(String key, Color[] palette) {
+        if (palette == null || palette.length == 0) {
+            return AppTheme.TEXT_MUTED;
+        }
+        int hash = key == null ? 0 : key.hashCode();
+        int index = Math.abs(hash) % palette.length;
+        return palette[index];
+    }
+
+    private Color directMessageDotColor(String peerId) {
+        Color[] palette = new Color[]{
+                AppTheme.DM_DOT_GREEN,
+                AppTheme.DM_DOT_ORANGE,
+                AppTheme.DM_DOT_BLUE,
+                AppTheme.DM_DOT_PINK
+        };
+        return colorFromPalette(peerId, palette);
+    }
+
+    private Color peerAvatarColor(String peerId) {
+        Color[] palette = new Color[]{
+                AppTheme.PEER_AVATAR_BLUE,
+                AppTheme.PEER_AVATAR_GREEN,
+                AppTheme.PEER_AVATAR_GOLD,
+                AppTheme.PEER_AVATAR_PURPLE
+        };
+        return colorFromPalette(peerId, palette);
+    }
+
+    private DirectMessageEntry ensureDirectMessageEntry(String peerId, String displayName) {
+        if (peerId == null) {
+            return null;
+        }
+
+        String safeName = (displayName == null || displayName.isBlank()) ? "Unknown" : displayName.trim();
+        DirectMessageEntry existing = dmEntriesByPeer.get(peerId);
+        if (existing == null) {
+            existing = new DirectMessageEntry(peerId, safeName);
+            dmEntriesByPeer.put(peerId, existing);
+            dmListModel.addElement(existing);
+            return existing;
+        }
+
+        if (!existing.displayName().equals(safeName)) {
+            existing.setDisplayName(safeName);
+            dmList.repaint();
+        }
+        return existing;
+    }
+
     @Override
     public void onPeerListUpdated(List<PeerInfo> peers) {
         SwingUtilities.invokeLater(() -> {
@@ -767,8 +908,16 @@ public class MainFrame extends JFrame implements ChatNodeListener {
             for (PeerInfo peer : peers) {
                 peersById.put(peer.userId(), peer);
                 peerListModel.addElement(peer);
+
+                DirectMessageEntry entry = dmEntriesByPeer.get(peer.userId());
+                if (entry != null && !entry.displayName().equals(peer.displayName())) {
+                    entry.setDisplayName(peer.displayName());
+                }
             }
-            setStatus("Online peers: " + peers.size());
+            dmList.repaint();
+            peerList.repaint();
+            updateSidebarUnreadBadges();
+            setStatus("Online peers: " + peers.size() + " - " + (node.isHybrid() ? "hybrid mode" : "udp mode"));
         });
     }
 
@@ -799,6 +948,11 @@ public class MainFrame extends JFrame implements ChatNodeListener {
             conversationMessageIds.computeIfAbsent(key, ignored -> new HashSet<>());
             conversationTitles.putIfAbsent(key, "#" + room);
             appendMessage(key, message);
+
+            boolean mine = message.senderId() != null && message.senderId().equals(node.userId());
+            if (!key.equals(currentConversationKey) && !mine) {
+                incrementUnread(key);
+            }
 
             if (joinedRooms.contains(room)) {
                 if (key.equals(currentConversationKey)) {
@@ -834,7 +988,14 @@ public class MainFrame extends JFrame implements ChatNodeListener {
             conversationMessageIds.computeIfAbsent(key, ignored -> new HashSet<>());
             pmTargetByConversation.put(key, otherUserId);
             conversationTitles.put(key, "@" + otherName);
+            ensureDirectMessageEntry(otherUserId, otherName);
             appendMessage(key, message);
+
+            boolean mine = message.senderId() != null && message.senderId().equals(node.userId());
+            if (!key.equals(currentConversationKey) && !mine) {
+                incrementUnread(key);
+            }
+
             setStatus("Private message from " + otherName);
         });
     }
@@ -844,6 +1005,35 @@ public class MainFrame extends JFrame implements ChatNodeListener {
         SwingUtilities.invokeLater(() -> setStatus(message));
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
