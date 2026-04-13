@@ -20,7 +20,6 @@ com\wifichat\network\NetworkInterfaceSelector.class
 com\wifichat\config\AppConfig.class
 com\wifichat\util\TextUtils.class
 com\wifichat\network\PacketCodec.class
-com\wifichat\network\ChatNode$2.class
 com\wifichat\ui\AppTheme.class
 com\wifichat\ui\MainFrame.class
 com\wifichat\util\TimeUtils.class
