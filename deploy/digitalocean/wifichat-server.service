@@ -1,0 +1,22 @@
+[Unit]
+Description=WiFi Chat TCP Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wifichat
+Group=wifichat
+WorkingDirectory=/opt/wifichat
+EnvironmentFile=/etc/wifichat/server.env
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/wifichat/wifi-chat-server.jar --port ${APP_PORT} --db ${DB_PATH}
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=append:/var/log/wifichat/server.log
+StandardError=append:/var/log/wifichat/server.err.log
+
+[Install]
+WantedBy=multi-user.target

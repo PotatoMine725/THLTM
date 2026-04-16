@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily backup timer for WiFi Chat SQLite
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=wifichat-backup.service
+
+[Install]
+WantedBy=timers.target
