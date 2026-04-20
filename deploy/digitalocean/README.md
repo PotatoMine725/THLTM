@@ -37,7 +37,7 @@ Expected outputs:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.ps1 `
-  -ServerIp "<DROPLET_IP>" `
+  -ServerIp "167.71.201.89" `
   -User "root" `
   -KeyPath "$HOME\.ssh\DiOceanOpenSSH" `
   -SetupFirewall
@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.p
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.ps1 `
-  -ServerIp "<DROPLET_IP>" `
+  -ServerIp "167.71.201.89" `
   -User "root" `
   -KeyPath "$HOME\.ssh\DiOceanOpenSSH" `
   -SetupFirewall `
@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.p
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.ps1 `
-  -ServerIp "<DROPLET_IP>" `
+  -ServerIp "167.71.201.89" `
   -User "root" `
   -KeyPath "$HOME\.ssh\DiOceanOpenSSH" `
   -SetupFirewall `
@@ -87,7 +87,7 @@ Expected:
 powershell -ExecutionPolicy Bypass -File scripts\run.ps1 `
   -SkipBuild `
   -Mode hybrid `
-  -ServerHost "<DROPLET_IP>" `
+  -ServerHost "167.71.201.89" `
   -ServerPort 61000 `
   -Profile A
 ```
@@ -97,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run.ps1 `
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run-admin.ps1 `
   -SkipBuild `
-  -ServerHost "<DROPLET_IP>" `
+  -ServerHost "167.71.201.89" `
   -ServerPort 61000 `
   -Profile adminA
 ```
@@ -128,7 +128,7 @@ Send message from client and confirm logs update in real time.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\package-client.ps1 `
-  -ServerHost "<DROPLET_IP>" `
+  -ServerHost "167.71.201.89" `
   -ServerPort 61000 `
   -Group 239.255.50.10 `
   -Port 50000 `

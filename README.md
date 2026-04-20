@@ -105,19 +105,25 @@ Output:
 powershell -ExecutionPolicy Bypass -File scripts\run-server.ps1 -SkipBuild -Port 61000 -DbPath "D:\Code\Java\test\out\chat-server-1.db"
 ```
 
-### 4.4 Chay client hybrid (may cung chay server)
+### 4.4 Chay client hybrid local (server tren cung may)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode hybrid -ServerHost 127.0.0.1 -ServerPort 61000 -Group 239.255.50.10 -Port 50000 -Room General -Profile A
 ```
 
-### 4.5 Chay client hybrid (may khac trong LAN)
+### 4.5 Chay client hybrid voi server cloud (DigitalOcean)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode hybrid -ServerHost 192.168.1.10 -ServerPort 61000 -Group 239.255.50.10 -Port 50000 -Room General -Profile B
+powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode hybrid -ServerHost 167.71.201.89 -ServerPort 61000 -Group 239.255.50.10 -Port 50000 -Room General -Profile B
 ```
 
-### 4.6 Gia lap nhieu client tren cung 1 may
+### 4.6 Chay admin app voi server cloud (DigitalOcean)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-admin.ps1 -SkipBuild -ServerHost 167.71.201.89 -ServerPort 61000 -Profile adminA
+```
+
+### 4.7 Gia lap nhieu client tren cung 1 may
 
 Mo nhieu terminal va chay moi terminal 1 lenh (doi `-Profile` va `-PrivatePort`):
 
@@ -127,13 +133,25 @@ powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode hybrid
 powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode hybrid -ServerHost 127.0.0.1 -ServerPort 61000 -Profile C -PrivatePort 50013
 ```
 
-### 4.7 Chay che do UDP-only fallback
+### 4.8 Chay che do UDP-only fallback
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run.ps1 -SkipBuild -Mode udp-only -Name Alice -Group 239.255.50.10 -Port 50000 -Room General
 ```
 
-### 4.8 Dong goi ban gui khach (khong can cai Java)
+### 4.9 Deploy server len DigitalOcean (tu may local)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.ps1 -ServerIp 167.71.201.89 -User root -KeyPath "$HOME\.ssh\DiOceanOpenSSH" -SetupFirewall
+```
+
+Redeploy nhanh (bo qua build local):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\digitalocean\deploy-to-droplet.ps1 -ServerIp 167.71.201.89 -User root -KeyPath "$HOME\.ssh\DiOceanOpenSSH" -SetupFirewall -SkipBuild
+```
+
+### 4.10 Dong goi ban gui khach (khong can cai Java)
 
 Neu muon sach ban cu truoc khi dong goi:
 
@@ -144,21 +162,21 @@ Remove-Item -Recurse -Force .\dist\*
 Dong goi portable:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\package-client.ps1 -ServerHost 192.168.1.10 -ServerPort 61000 -Group 239.255.50.10 -Port 50000 -Room General
+powershell -ExecutionPolicy Bypass -File scripts\package-client.ps1 -ServerHost 167.71.201.89 -ServerPort 61000 -Group 239.255.50.10 -Port 50000 -Room General
 ```
 
 Output:
 - Thu muc portable: `dist\WiFiChatClient-portable`
 - File zip gui nguoi dung: `dist\WiFiChatClient-portable.zip`
 
-### 4.9 Neu terminal khong nhan Maven (`mvn`)
+### 4.11 Neu terminal khong nhan Maven (`mvn`)
 
 ```powershell
 $env:Path="D:\Tools\apache-maven-3.9.9\bin;$env:Path"
 mvn -v
 ```
 
-### 4.10 Dung server/client
+### 4.12 Dung server/client
 
 Nhan `Ctrl + C` o terminal dang chay.
 ## 5) Luu y trien khai LAN
@@ -191,7 +209,7 @@ Nhan `Ctrl + C` o terminal dang chay.
 Co script dong goi san:
 
 ~~~powershell
-powershell -ExecutionPolicy Bypass -File scripts\package-client.ps1 -ServerHost 192.168.1.10 -ServerPort 61000 -Room General
+powershell -ExecutionPolicy Bypass -File scripts\package-client.ps1 -ServerHost 167.71.201.89 -ServerPort 61000 -Room General
 ~~~
 
 Ket qua:
@@ -221,6 +239,7 @@ Khi server khoi dong voi DB moi, he thong tu tao tai khoan admin:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run-admin.ps1 -SkipBuild -ServerHost 127.0.0.1 -ServerPort 61000 -Profile adminA
+powershell -ExecutionPolicy Bypass -File scripts\run-admin.ps1 -SkipBuild -ServerHost 167.71.201.89 -ServerPort 61000 -Profile adminA
 ```
 
 ### 9.3 Chuc nang admin
